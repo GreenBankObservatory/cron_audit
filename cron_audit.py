@@ -32,7 +32,7 @@ DEFAULT_SSH_OPTIONS = [
     # This avoids hanging on a password prompt on hosts that don't allow key auth
     "PasswordAuthentication=no",
 ]
-DEFAULT_OUTPUT_PATH = "./report.md"
+DEFAULT_OUTPUT_PATH = Path(".")
 TERMINAL_WIDTH, __ = shutil.get_terminal_size()
 
 
@@ -57,7 +57,7 @@ def parse_host_specs(host_specs, host_blacklist_path):
     if host_blacklist_path:
         with open(host_blacklist_path) as file:
             host_blacklist = file.read().splitlines()
-        print(f"Excluding hosts from audit: {host_blacklist}")
+        tqdm.write(f"Excluding hosts from audit: {host_blacklist}")
 
     return (
         [
@@ -228,9 +228,7 @@ def do_partial(last_run_output_path):
     return None, None
 
 
-def main():
-    args = parse_args()
-    user = args.user if args.user else getuser()
+def do_user(user, args):
     last_run_output_path = Path(CRON_AUDIT_CACHE_PATH, f"last_run.{user}.json")
     if args.full:
         hostnames, host_blacklist = do_full(
@@ -250,8 +248,34 @@ def main():
         CRON_AUDIT_CACHE_PATH.mkdir(parents=True, exist_ok=True)
         with open(last_run_output_path, "w") as file:
             json.dump({**_report, "blacklist": host_blacklist}, file)
-    # pprint(crontabs_by_host)
-    report(user, crontabs_by_host, host_blacklist, args.output_path)
+    return crontabs_by_host, host_blacklist
+
+
+def main():
+    args = parse_args()
+    users = args.users if args.users else [getuser()]
+    if len(users) == 1:
+        user = users[0]
+        crontabs_by_host, host_blacklist = do_user(user, args)
+        report(
+            user,
+            crontabs_by_host,
+            host_blacklist,
+            Path(args.output_path, f"crontab_audit_report.{user}.md"),
+        )
+    else:
+        results = []
+        for user in tqdm(users):
+            crontabs_by_host, host_blacklist = do_user(user, args)
+            results.append((user, crontabs_by_host, host_blacklist))
+
+        for user, crontabs_by_host, host_blacklist in results:
+            report(
+                user,
+                crontabs_by_host,
+                host_blacklist,
+                Path(args.output_path, f"crontab_audit_report.{user}.md"),
+            )
 
 
 def parse_args():
@@ -259,8 +283,8 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "user",
-        nargs="?",
+        "users",
+        nargs="*",
         help="Username to audit crontabs for. If not given, "
         "defaults to the current user.",
     )
@@ -300,6 +324,7 @@ def parse_args():
         "-o",
         "--output-path",
         default=DEFAULT_OUTPUT_PATH,
+        type=Path,
         help="The path that the report will be written to",
     )
     parser.add_argument(
