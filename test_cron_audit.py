@@ -4,8 +4,8 @@ from cron_audit import cron_audit, filter_hosts
 
 
 def test_cron_audit_allow_invalid_hosts_true():
-    host_specs = [{"hostname": "foo", "os": "Linux"}]
-    actual = cron_audit("foo_user", host_specs)
+    hostnames = ["foo"]
+    actual = cron_audit("foo_user", hostnames)
     expected = {
         "valid": {},
         "error_no_crontab": {},
@@ -19,18 +19,18 @@ def test_cron_audit_allow_invalid_hosts_true():
 
 # TODO: This is not a real unit test; depends on external behavior! Needs mock
 def test_cron_audit_allow_invalid_hosts_false():
-    host_specs = [{"hostname": "foo", "os": "Linux"}]
+    hostnames = ["foo"]
     with pytest.raises(ValueError) as excinfo:
-        cron_audit("foo_user", host_specs, allow_invalid_hosts=False)
+        cron_audit("foo_user", hostnames, allow_invalid_hosts=False)
 
     assert "Invalid host!" in str(excinfo.value)
 
 
 # TODO: This is not a real unit test; depends on external behavior! Needs mock
 def test_cron_audit_allow_missing_crontab_false():
-    host_specs = [{"hostname": "trent2", "os": "Linux"}]
+    hostnames = ["trent2"]
     with pytest.raises(ValueError) as excinfo:
-        cron_audit("monctrl", host_specs, allow_missing_crontab=False)
+        cron_audit("monctrl", hostnames, allow_missing_crontab=False)
 
     assert "Missing crontab!" in str(excinfo.value)
 
